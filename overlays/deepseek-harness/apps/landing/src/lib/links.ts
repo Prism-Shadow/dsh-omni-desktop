@@ -1,5 +1,7 @@
 /** External links and shared constants used across the landing pages. */
 
+export const PROJECT_REPO_URL = 'https://github.com/Prism-Shadow/dsh-omni-desktop'
+export const PROJECT_OSS_ORIGIN = 'https://dsh-omni-desktop-releases.oss-cn-beijing.aliyuncs.com'
 export const REPO_URL = 'https://github.com/deepseek-ai/deepseek-harness'
 export const RELEASES_URL = `${REPO_URL}/releases`
 export const LICENSE_URL = `${REPO_URL}/blob/master/LICENSE`
@@ -21,8 +23,8 @@ export const DOCS_PROVIDERS_EN_URL = `${REPO_URL}/blob/master/docs/user/guide/pr
  * mirror stores immutable per-tag directories instead, so mirror links need the
  * current tag from latest.json.
  */
-export const DESKTOP_RELEASE_REPO_URL = (import.meta.env.VITE_DESKTOP_RELEASE_REPO_URL ?? '').replace(/\/+$/, '')
-export const OSS_ORIGIN = (import.meta.env.VITE_DESKTOP_OSS_ORIGIN ?? '').replace(/\/+$/, '')
+export const DESKTOP_RELEASE_REPO_URL = (import.meta.env.VITE_DESKTOP_RELEASE_REPO_URL ?? PROJECT_REPO_URL).replace(/\/+$/, '')
+export const OSS_ORIGIN = (import.meta.env.VITE_DESKTOP_OSS_ORIGIN ?? PROJECT_OSS_ORIGIN).replace(/\/+$/, '')
 export const DESKTOP_RELEASES_URL = DESKTOP_RELEASE_REPO_URL === ''
   ? ''
   : `${DESKTOP_RELEASE_REPO_URL}/releases`

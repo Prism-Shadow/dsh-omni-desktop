@@ -1,0 +1,107 @@
+# Public site: build the DSH Omni Desktop landing page and deploy it to GitHub Pages.
+# - Pull requests only build the landing page for validation.
+# - Pushes to main and manual dispatches build and deploy.
+# The repository uses a custom Pages domain (dod.penguin.ooo), so BASE_PATH is "/".
+name: Deploy Site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deepseek-harness"
+      - "overlays/deepseek-harness/apps/landing/**"
+      - "overlays/deepseek-harness/package.json"
+      - "overlays/deepseek-harness/pnpm-lock.yaml"
+      - "overlays/deepseek-harness/pnpm-workspace.yaml"
+      - "scripts/sync-harness.ps1"
+      - ".github/workflows/pages.yml"
+  pull_request:
+    paths:
+      - "deepseek-harness"
+      - "overlays/deepseek-harness/apps/landing/**"
+      - "overlays/deepseek-harness/package.json"
+      - "overlays/deepseek-harness/pnpm-lock.yaml"
+      - "overlays/deepseek-harness/pnpm-workspace.yaml"
+      - "scripts/sync-harness.ps1"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  PRIMARY_NODE_VERSION: "24"
+  DSH_TELEMETRY_DISABLED: "1"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: .work/ci/deepseek-harness
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: true
+
+      - name: Sync upstream workspace
+        shell: pwsh
+        working-directory: .
+        run: ./scripts/sync-harness.ps1 -Workspace .work/ci/deepseek-harness
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Configure pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: |
+          store_root="$HOME/.local/share/pnpm/store"
+          echo "PNPM_CONFIG_STORE_DIR=$store_root" >> "$GITHUB_ENV"
+          store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('.work/ci/deepseek-harness/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build landing
+        env:
+          BASE_PATH: /
+        run: pnpm run build:landing
+
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .work/ci/deepseek-harness/apps/landing/dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

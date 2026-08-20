@@ -2,7 +2,7 @@
 import type { Strings } from './strings'
 
 export const en: Strings = {
-  siteName: 'DeepSeek Harness',
+  siteName: 'DSH Omni Desktop',
 
   nav: {
     docs: 'Docs',
@@ -13,23 +13,35 @@ export const en: Strings = {
   lang: { label: 'Language', zh: '中文', en: 'English', system: 'System' },
 
   footer: {
-    tagline: 'The open-source agent harness where everything is a plugin.',
+    tagline: 'The all-modal DSH desktop client.',
     resources: 'Resources',
     repo: 'GitHub repository',
     docs: 'Documentation',
     releases: 'Releases',
     license: 'License',
-    copyright: 'DeepSeek Harness · MIT License',
+    copyright: 'DSH Omni Desktop · MIT License',
   },
 
   copy: { copy: 'Copy', copied: 'Copied' },
 
   download: {
-    title: 'Download the desktop app',
-    subtitle: 'The full web experience packaged as a standalone app: a bundled Node runtime and local server — open it and go, no Node install, no command line.',
-    downloadCta: 'Download desktop',
-    downloadCtaFor: (platform: string) => `Download desktop (${platform})`,
+    eyebrow: 'All-modal DSH desktop client',
+    title: 'DSH OMNI',
+    titleAccent: 'DESKTOP.',
+    subtitle: 'Bring multimodal chat, tool use, and the local runtime into one desktop entry.',
+    description: 'DSH Omni Desktop is built for daily development and agent workflows: it bundles the Node runtime and local service, keeps the full Web experience, and starts without manual command-line setup.',
+    highlightsLabel: 'Core capabilities',
+    highlights: ['Full desktop Web experience', 'Bundled runtime and local service', 'Multimodal workflow entry'],
+    downloadCta: 'Download desktop client',
+    downloadCtaFor: (platform: string) => `Download for ${platform}`,
     recommended: 'Detected',
+    platformTitle: 'Choose an installer',
+    platformHint: 'All platform links stay available',
+    previewKicker: 'DESKTOP_PREVIEW::OMNI',
+    screenshotTitle: 'Desktop screenshot slot',
+    screenshotHint: 'Real DSH Omni Desktop product screenshot',
+    screenshotAlt: 'DSH Omni Desktop desktop client interface screenshot',
+    previewTags: ['All-modal', 'Local runtime', 'Plugin-ready'],
     platforms: {
       mac: { name: 'macOS', require: 'macOS 11 or later, dmg image (pick your chip)' },
       windows: { name: 'Windows', require: 'Windows 10 or later (x64), NSIS installer' },
@@ -43,12 +55,13 @@ export const en: Strings = {
     checksums: 'Checksums (SHA256SUMS.desktop)',
     allReleases: 'All releases',
     faq: {
-      title: 'First-launch FAQ',
+      kicker: 'First launch',
+      title: 'Launch notes',
       intro: 'The current builds are unsigned, so the OS may block the first launch — follow the steps for your system once.',
       mac: {
-        question: 'macOS says "DeepSeek Harness" is damaged and cannot be opened?',
+        question: 'macOS says the app is damaged and cannot be opened?',
         why: 'macOS quarantines files downloaded from the web, and unsigned apps get misreported as "damaged". Removing the flag fixes it:',
-        stepDrag: 'Open the downloaded dmg and drag DeepSeek Harness into Applications.',
+        stepDrag: 'Open the downloaded dmg and drag the app into Applications.',
         stepTerminal: 'Open Terminal (Launchpad → Other → Terminal).',
         stepPaste: 'Paste this command into the terminal, press Enter, then type your password (nothing shows while typing; press Enter):',
         stepOpen: 'After it finishes, double-click the app to open it normally.',
