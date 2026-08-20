@@ -1,12 +1,14 @@
-# dsh omni desktop
+# Dsh-omni-Desktop (DoD)
 
 中文 | [English](README.en.md)
 
-dsh omni desktop 是面向普通用户的 DeepSeek Harness 桌面发行版。下载安装后即可在桌面窗口中使用 DeepSeek Harness 的本地 Web UI、会话、工作区和插件能力，无需手动准备 Node.js 或命令行启动流程。
+DoD 是面向普通用户的 DeepSeek Harness 桌面发行版。下载安装后即可在桌面窗口中使用 DeepSeek Harness 的本地 Web UI、会话、工作区和插件能力，无需手动准备 Node.js 或命令行启动流程。
 
-[![下载 dsh omni desktop](https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD-dsh%20omni%20desktop-2563eb?style=for-the-badge)](https://dod.penguin.ooo/)
+<h3 align="center">
+  <a href="https://dod.penguin.ooo/">进入下载页</a>
+</h3>
 
-![dsh omni desktop screenshot](assets/readme/desktop-vision-demo.png)
+![DoD screenshot](assets/readme/desktop-vision-demo.png)
 
 ## 下载
 
@@ -32,7 +34,7 @@ dsh omni desktop 是面向普通用户的 DeepSeek Harness 桌面发行版。下
 
 1. 从下载页或 GitHub Releases 下载适合你系统的安装包。
 2. 按系统提示完成安装。
-3. 启动 dsh omni desktop。
+3. 启动 DoD。
 4. 选择或创建工作区。
 5. 新建会话并开始使用。
 
@@ -66,11 +68,11 @@ dsh omni desktop 是面向普通用户的 DeepSeek Harness 桌面发行版。下
 
 ### 这是 DeepSeek Harness 官方桌面端吗？
 
-不是。dsh omni desktop 是社区维护的桌面发行项目，用于打包和分发基于 DeepSeek Harness 的桌面体验。它与深度求索及 DeepSeek Harness 上游官方团队不存在隶属、合作、授权或背书关系。
+不是。DoD 是社区维护的桌面发行项目，用于打包和分发基于 DeepSeek Harness 的桌面体验。它与深度求索及 DeepSeek Harness 上游官方团队不存在隶属、合作、授权或背书关系。
 
-### dsh omni desktop 和 DeepSeek Harness 是什么关系？
+### DoD 和 DeepSeek Harness 是什么关系？
 
-DeepSeek Harness 提供核心智能体能力、Web UI、会话系统和插件机制。dsh omni desktop 跟踪上游 DeepSeek Harness 源码，并在打包时应用桌面端 overlay，负责桌面窗口、安装包、发布流程和桌面托管插件。
+DeepSeek Harness 提供核心智能体能力、Web UI、会话系统和插件机制。DoD 跟踪上游 DeepSeek Harness 源码，并在打包时应用桌面端 overlay，负责桌面窗口、安装包、发布流程和桌面托管插件。
 
 上游项目地址：
 
@@ -121,4 +123,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-desktop.ps1
 
 文档中提到 “DeepSeek Harness”，仅用于说明本桌面发行版所兼容和引用的上游开源项目；相关名称和商标归其权利人所有。
 
-dsh omni desktop 由社区独立维护，不代表深度求索或 DeepSeek Harness 上游团队，也不表示本项目获得其官方授权或推荐。
+DoD 由社区独立维护，不代表深度求索或 DeepSeek Harness 上游团队，也不表示本项目获得其官方授权或推荐。
