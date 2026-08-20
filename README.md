@@ -4,15 +4,19 @@
 
 dsh omni desktop 是面向普通用户的 DeepSeek Harness 桌面发行版。下载安装后即可在桌面窗口中使用 DeepSeek Harness 的本地 Web UI、会话、工作区和插件能力，无需手动准备 Node.js 或命令行启动流程。
 
+[![下载 dsh omni desktop](https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD-dsh%20omni%20desktop-2563eb?style=for-the-badge)](https://dod.penguin.ooo/)
+
 ![dsh omni desktop screenshot](assets/readme/desktop-vision-demo.png)
 
 ## 下载
 
-推荐从 GitHub Releases 下载桌面安装包：
+推荐先打开下载页，它会汇总当前桌面安装包和可用下载源：
+
+- [下载页](https://dod.penguin.ooo/)
+
+也可以直接从 GitHub Releases 下载桌面端安装包：
 
 - [GitHub Releases](https://github.com/Prism-Shadow/dsh-omni-desktop/releases)
-
-这是桌面端的 GitHub 源下载入口，也适合作为 OSS 或官网镜像不可用时的备用下载来源。
 
 当前发布流程会产出这些桌面端文件，实际可下载内容以对应 Release 页面为准：
 
@@ -22,11 +26,11 @@ dsh omni desktop 是面向普通用户的 DeepSeek Harness 桌面发行版。下
 | macOS Universal | `.dmg` 和 `.zip` |
 | Linux x64 | `.AppImage` 和 `.deb` |
 
-如果 Release 同时提供 OSS 或官网镜像下载，任选一个来源下载即可；文件内容应与 GitHub Release 中的发布产物一致。
+如果下载页同时提供 GitHub、OSS 或官网镜像，任选一个来源下载即可；文件内容应与 GitHub Release 中的发布产物一致。
 
 ## 安装与首次启动
 
-1. 从 GitHub Releases 下载适合你系统的安装包。
+1. 从下载页或 GitHub Releases 下载适合你系统的安装包。
 2. 按系统提示完成安装。
 3. 启动 dsh omni desktop。
 4. 选择或创建工作区。
@@ -78,7 +82,7 @@ DeepSeek Harness 提供核心智能体能力、Web UI、会话系统和插件机
 
 ### 能从 GitHub 下载吗？
 
-可以。桌面端安装包会发布到本仓库的 [GitHub Releases](https://github.com/Prism-Shadow/dsh-omni-desktop/releases)。如果同时提供其他镜像，GitHub Releases 仍然是最直接的下载源之一。
+可以。桌面端安装包会发布到本仓库的 [GitHub Releases](https://github.com/Prism-Shadow/dsh-omni-desktop/releases)。下载页也会指向可用的 GitHub 源和镜像源。
 
 ## 给维护者
 

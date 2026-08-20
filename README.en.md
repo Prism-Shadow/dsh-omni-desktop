@@ -4,15 +4,19 @@
 
 dsh omni desktop is a desktop distribution of DeepSeek Harness for everyday users. Install it, open the desktop app, choose a workspace, and use the DeepSeek Harness local Web UI without manually preparing Node.js or starting the web service from a terminal.
 
+[![Download dsh omni desktop](https://img.shields.io/badge/Download-dsh%20omni%20desktop-2563eb?style=for-the-badge)](https://dod.penguin.ooo/)
+
 ![dsh omni desktop screenshot](assets/readme/desktop-vision-demo.png)
 
 ## Download
 
-Download desktop installers from GitHub Releases:
+Start from the download page, which collects the current desktop installers and available download sources:
+
+- [Download page](https://dod.penguin.ooo/)
+
+You can also download installers directly from GitHub Releases:
 
 - [GitHub Releases](https://github.com/Prism-Shadow/dsh-omni-desktop/releases)
-
-This is the GitHub download source for the desktop app and can be used as a fallback when an OSS or website mirror is unavailable.
 
 The release workflow can produce these desktop packages. The exact available files are listed on each Release page.
 
@@ -22,11 +26,11 @@ The release workflow can produce these desktop packages. The exact available fil
 | macOS Universal | `.dmg` and `.zip` |
 | Linux x64 | `.AppImage` and `.deb` |
 
-If a Release also offers an OSS or website mirror, either source is fine; the mirrored files should match the GitHub Release artifacts.
+If the download page offers GitHub, OSS, or website mirrors, any source is fine; the mirrored files should match the GitHub Release artifacts.
 
 ## Install And Start
 
-1. Download the installer for your system from GitHub Releases.
+1. Download the installer for your system from the download page or GitHub Releases.
 2. Install the app using your operating system's normal flow.
 3. Launch dsh omni desktop.
 4. Choose or create a workspace.
@@ -78,7 +82,7 @@ The managed plugins are third-party npm packages. The desktop app installs them 
 
 ### Can I download from GitHub?
 
-Yes. Desktop packages are published to this repository's [GitHub Releases](https://github.com/Prism-Shadow/dsh-omni-desktop/releases). If mirrors are also provided, GitHub Releases remains one of the direct download sources.
+Yes. Desktop packages are published to this repository's [GitHub Releases](https://github.com/Prism-Shadow/dsh-omni-desktop/releases). The download page also links to available GitHub and mirror sources.
 
 ## Maintainer Notes
 
