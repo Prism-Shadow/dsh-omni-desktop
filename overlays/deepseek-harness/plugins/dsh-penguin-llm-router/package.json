@@ -3,6 +3,11 @@
   "description": "Desktop platform login for DeepSeek Harness: dual-face plugin — the host half runs the B+verifier one-time-code flow against the Penguin API Hub platform (credential/settings provisioning, account status as the platformAuth Typert Remote namespace), and the web half renders the login entry and the platform account settings section over the same namespace",
   "version": "0.1.3",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Prism-Shadow/dsh-omni-desktop.git",
+    "directory": "overlays/deepseek-harness/plugins/dsh-penguin-llm-router"
+  },
   "publishConfig": {
     "access": "public"
   },
