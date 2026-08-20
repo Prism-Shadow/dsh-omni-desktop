@@ -1,57 +1,126 @@
-# DSH Omni Desktop
+# Dsh-omni-Desktop (DoD)
 
-DSH Omni Desktop is the desktop distribution repository for DeepSeek Harness.
-The upstream harness source is tracked as the `deepseek-harness/` submodule,
-while desktop distribution files live in `overlays/deepseek-harness/`.
+中文 | [English](README.en.md)
 
-## Repository Layout
+DoD 是面向普通用户的 DeepSeek Harness 桌面发行版。下载安装后即可在桌面窗口中使用 DeepSeek Harness 的本地 Web UI、会话、工作区和插件能力，无需手动准备 Node.js 或命令行启动流程。
 
-- `deepseek-harness/` is the upstream `deepseek-ai/deepseek-harness` submodule.
-- `overlays/deepseek-harness/` contains desktop, landing, plugin, workflow, and release files that are applied over upstream for builds.
-- `scripts/sync-harness.ps1` creates `.work/deepseek-harness` from the submodule and applies the overlay.
-- `scripts/package-desktop.ps1` syncs the workspace and builds the Windows desktop installer locally.
+<h3 align="center">
+  <a href="https://dod.penguin.ooo/">进入下载页</a>
+</h3>
 
-## Local Packaging
+![DoD screenshot](assets/readme/desktop-vision-demo.png)
+
+## 下载
+
+推荐先打开下载页，它会汇总当前桌面安装包和可用下载源：
+
+- [下载页](https://dod.penguin.ooo/)
+
+也可以直接从 GitHub Releases 下载桌面端安装包：
+
+- [GitHub Releases](https://github.com/Prism-Shadow/dsh-omni-desktop/releases)
+
+当前发布流程会产出这些桌面端文件，实际可下载内容以对应 Release 页面为准：
+
+| 平台 | 安装包 |
+| --- | --- |
+| Windows x64 | `.exe` 安装程序 |
+| macOS Universal | `.dmg` 和 `.zip` |
+| Linux x64 | `.AppImage` 和 `.deb` |
+
+如果下载页同时提供 GitHub、OSS 或官网镜像，任选一个来源下载即可；文件内容应与 GitHub Release 中的发布产物一致。
+
+## 安装与首次启动
+
+1. 从下载页或 GitHub Releases 下载适合你系统的安装包。
+2. 按系统提示完成安装。
+3. 启动 DoD。
+4. 选择或创建工作区。
+5. 新建会话并开始使用。
+
+首次启动时，桌面端会用 DeepSeek Harness 官方的 `dsh plugin add` 方式，把桌面托管的第三方插件安装到用户的 `web` profile 中。插件源码不打进 Harness runtime；它们以公开 npm 包的形式发布和更新。
+
+## 日常使用
+
+- **工作区**：在侧边栏选择或新建工作区，会话记录按工作区组织。
+- **新会话**：点击 `New Session` 开始一次新的任务。
+- **模型选择**：在输入框右侧选择当前会话使用的模型。
+- **图片理解**：粘贴或上传图片后，视觉插件会把图片交给已配置的视觉模型并返回说明。
+- **会话日志**：右上角 `Session log` 可下载当前会话日志，便于排查问题。
+- **设置**：左下角 `Settings` 中管理桌面端配置和平台账号状态。
+
+## 内置托管插件
+
+桌面端首次启动会自动安装这些 npm 插件：
+
+| 插件 | npm 包 | 作用 |
+| --- | --- | --- |
+| DeepSeek Eyes | [`@prismshadow/dsh-deepseek-eyes`](https://www.npmjs.com/package/@prismshadow/dsh-deepseek-eyes) | 提供 `describe_image` 图片理解工具 |
+| Penguin LLM Router | [`@prismshadow/dsh-penguin-llm-router`](https://www.npmjs.com/package/@prismshadow/dsh-penguin-llm-router) | 提供平台登录、模型路由和账号状态集成 |
+
+如果自动安装失败，请查看桌面日志。Windows 上日志通常位于：
+
+```text
+%APPDATA%\DeepSeek Harness\desktop.log
+```
+
+## 常见问题
+
+### 这是 DeepSeek Harness 官方桌面端吗？
+
+不是。DoD 是社区维护的桌面发行项目，用于打包和分发基于 DeepSeek Harness 的桌面体验。它与深度求索及 DeepSeek Harness 上游官方团队不存在隶属、合作、授权或背书关系。
+
+### DoD 和 DeepSeek Harness 是什么关系？
+
+DeepSeek Harness 提供核心智能体能力、Web UI、会话系统和插件机制。DoD 跟踪上游 DeepSeek Harness 源码，并在打包时应用桌面端 overlay，负责桌面窗口、安装包、发布流程和桌面托管插件。
+
+上游项目地址：
+
+- [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)
+
+### 插件为什么不是直接写进 Harness？
+
+这两个插件按第三方插件发布到 npm。桌面端只负责在用户首次启动时用官方插件安装流程安装它们。这样插件可以独立发布，桌面端也可以在后续 release 中选择是否更新安装版本。
+
+### 能从 GitHub 下载吗？
+
+可以。桌面端安装包会发布到本仓库的 [GitHub Releases](https://github.com/Prism-Shadow/dsh-omni-desktop/releases)。下载页也会指向可用的 GitHub 源和镜像源。
+
+## 给维护者
+
+本仓库只保存桌面发行相关内容：
+
+- `deepseek-harness/`：上游 DeepSeek Harness 子模块
+- `overlays/deepseek-harness/`：应用到上游 checkout 的桌面发行 overlay
+- `overlays/deepseek-harness/apps/desktop/`：桌面壳 overlay
+- `overlays/deepseek-harness/plugins/`：桌面托管插件源码
+- `scripts/sync-harness.ps1`：同步上游并应用 overlay
+- `scripts/package-desktop.ps1`：本地 Windows 打包脚本
+- `.github/workflows/`：桌面构建、Release、OSS 和 npm 插件发布工作流
+
+本地同步：
 
 ```powershell
 git submodule update --init --recursive
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-desktop.ps1
-```
-
-The generated Windows installer is written under the printed `.work/package/<run>/apps/desktop/stage/out/` path.
-
-## Plugin npm Release
-
-The desktop-managed profile plugins live under `overlays/deepseek-harness/plugins/` and are published as normal public npm packages. The desktop app installs them into the user's `web` profile with `dsh plugin add`; the plugin source is not bundled into the harness runtime.
-
-Before the first real publish from this repository, configure npm Trusted Publishing for both packages:
-
-- `@prismshadow/dsh-deepseek-eyes`
-- `@prismshadow/dsh-penguin-llm-router`
-
-Use these npm Trusted Publisher settings for each package:
-
-- Publisher: GitHub Actions
-- Organization or user: `Prism-Shadow`
-- Repository: `dsh-omni-desktop`
-- Workflow filename: `plugin-release.yml`
-- Environment name: `npm-production`
-- Allowed actions: `npm publish`
-
-The workflow supports a safe dry run:
-
-```text
-Actions -> Plugin Release -> Run workflow -> dryRun=true
-```
-
-To publish, bump the selected plugin `version`, update the desktop profile plugin reference in `overlays/deepseek-harness/apps/desktop/src/main.ts`, merge the PR to `main`, then run the same workflow from `main` with `dryRun=false`. The workflow checks that the desktop install range matches each plugin package version before it publishes.
-
-## Updating Upstream
-
-```powershell
-git -C deepseek-harness fetch origin master
-git -C deepseek-harness checkout origin/master
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-harness.ps1 -Force
 ```
 
-Review overlay conflicts in `.work/deepseek-harness`, then commit the updated submodule pointer and any overlay changes together.
+本地 Windows 打包：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-desktop.ps1
+```
+
+生成的安装包会输出到脚本打印的目录，通常是：
+
+```text
+.work/package/<run>/apps/desktop/stage/out/
+```
+
+## 许可证与商标
+
+本项目基于 [MIT License](LICENSE) 开源发布。
+
+文档中提到 “DeepSeek Harness”，仅用于说明本桌面发行版所兼容和引用的上游开源项目；相关名称和商标归其权利人所有。
+
+DoD 由社区独立维护，不代表深度求索或 DeepSeek Harness 上游团队，也不表示本项目获得其官方授权或推荐。
