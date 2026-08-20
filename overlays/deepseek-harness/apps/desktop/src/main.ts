@@ -269,8 +269,8 @@ function ensureShippedProfileBundles(): void {
  * update` upgrades them independently of a desktop release.
  */
 const PROFILE_PLUGINS: readonly { name: string; version: string }[] = [
-  { name: '@prismshadow/dsh-deepseek-eyes', version: '^0.1.3' },
-  { name: '@prismshadow/dsh-penguin-llm-router', version: '^0.1.3' },
+  { name: '@prismshadow/dsh-deepseek-eyes', version: '^0.1.4' },
+  { name: '@prismshadow/dsh-penguin-llm-router', version: '^0.1.4' },
 ]
 
 interface ProfilePluginState {

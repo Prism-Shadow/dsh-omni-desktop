@@ -19,7 +19,7 @@ The tool is registered only while a durable attachment store and fs capability a
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `provider` | `google` | LLM route the subcall resolves through (the pi-ai google route) |
-| `model` | `gemini-3.1-flash-lite` | Vision model id on that route |
+| `model` | `gemini-3.5-flash-lite` | Vision model id on that route |
 | `maxTokens` | `1024` | Output-token cap of the subcall |
 | `systemPrompt` | plain-description instruction | System prompt sent to the vision model |
 

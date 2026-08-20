@@ -118,7 +118,7 @@ describe('registerVisionRewrite', () => {
     })
     for await (const _chunk of ctx.llm.stream({
       provider: 'google',
-      model: 'gemini-3.1-flash-lite',
+      model: 'gemini-3.5-flash-lite',
       messages: [message],
       signal: new AbortController().signal,
     })) { /* drain */ }

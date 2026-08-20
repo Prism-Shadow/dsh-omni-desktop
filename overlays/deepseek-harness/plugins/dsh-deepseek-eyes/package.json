@@ -1,7 +1,7 @@
 {
   "name": "@prismshadow/dsh-deepseek-eyes",
   "description": "Vision subcall for DeepSeek Harness: the describe_image tool sends one image to the platform Gemini route through ctx.llm and returns a text description, with approval and a log-only request event; the host llm/stream rewrite turns pasted image blocks into attachment-id markers the tool resolves from the durable attachment store",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "license": "MIT",
   "repository": {
     "type": "git",
