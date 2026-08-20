@@ -21,8 +21,9 @@
 # generated latest*.yml files will be served. Objects land under immutable
 # releases/<tag>/ keys; latest.json is uploaded last and only while the tag is
 # still GitHub's current latest Release. The OIDC provider on the Alibaba Cloud
-# side must trust this repository (subject claim repo:<owner>/<repo>, audience
-# github-actions).
+# side must trust this repository's environment-scoped subject for
+# oss-production (including immutable owner/repo ids when GitHub emits them) and
+# the github-actions audience.
 #
 # The landing download page links these artifacts by their version-less names:
 # the version lives in the tag and SHA256SUMS.desktop.

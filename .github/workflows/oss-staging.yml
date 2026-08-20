@@ -4,7 +4,9 @@
 # Environment oss-staging: the staging RAM role must round-trip an object under
 # staging/ and must NOT write releases/ or the production latest.json pointer.
 # Run this before the first desktop release, after configuring the environments
-# and the OIDC provider on the Alibaba Cloud side.
+# and the OIDC provider on the Alibaba Cloud side. The staging RAM role trust
+# must match this repository's oss-staging environment-scoped subject and the
+# github-actions audience.
 name: Test Alibaba Cloud OSS publishing
 
 on:

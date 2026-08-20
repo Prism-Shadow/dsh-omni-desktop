@@ -123,7 +123,7 @@ function Reset-AttributesForDelete {
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $submodulePath = Join-Path $repoRoot 'deepseek-harness'
-$overlayPath = Join-Path $repoRoot 'overlays\deepseek-harness'
+$overlayPath = Join-Path (Join-Path $repoRoot 'overlays') 'deepseek-harness'
 $workRoot = Join-Path $repoRoot '.work'
 
 if ([string]::IsNullOrWhiteSpace($Workspace)) {
