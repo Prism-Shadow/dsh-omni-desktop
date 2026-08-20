@@ -1,10 +1,10 @@
-# DSH Omni Desktop
+# dsh omni desktop
 
 [中文](README.md) | English
 
-DSH Omni Desktop is a desktop distribution of DeepSeek Harness for everyday users. Install it, open the desktop app, choose a workspace, and use the DeepSeek Harness local Web UI without manually preparing Node.js or starting the web service from a terminal.
+dsh omni desktop is a desktop distribution of DeepSeek Harness for everyday users. Install it, open the desktop app, choose a workspace, and use the DeepSeek Harness local Web UI without manually preparing Node.js or starting the web service from a terminal.
 
-![DSH Omni Desktop screenshot](assets/readme/desktop-vision-demo.png)
+![dsh omni desktop screenshot](assets/readme/desktop-vision-demo.png)
 
 ## Download
 
@@ -28,7 +28,7 @@ If a Release also offers an OSS or website mirror, either source is fine; the mi
 
 1. Download the installer for your system from GitHub Releases.
 2. Install the app using your operating system's normal flow.
-3. Launch DSH Omni Desktop.
+3. Launch dsh omni desktop.
 4. Choose or create a workspace.
 5. Start a new session.
 
@@ -62,11 +62,11 @@ If automatic plugin installation fails, check the desktop log. On Windows it is 
 
 ### Is this the official DeepSeek Harness desktop app?
 
-No. DSH Omni Desktop is an independently maintained community desktop distribution. It is not affiliated with, authorized by, endorsed by, or otherwise connected to DeepSeek or the official DeepSeek Harness upstream team.
+No. dsh omni desktop is an independently maintained community desktop distribution. It is not affiliated with, authorized by, endorsed by, or otherwise connected to DeepSeek or the official DeepSeek Harness upstream team.
 
 ### How does it relate to DeepSeek Harness?
 
-DeepSeek Harness provides the core agent capabilities, Web UI, session system, and plugin mechanism. DSH Omni Desktop tracks the upstream DeepSeek Harness source and applies a desktop distribution overlay for the native shell, installers, release workflows, and desktop-managed plugins.
+DeepSeek Harness provides the core agent capabilities, Web UI, session system, and plugin mechanism. dsh omni desktop tracks the upstream DeepSeek Harness source and applies a desktop distribution overlay for the native shell, installers, release workflows, and desktop-managed plugins.
 
 Upstream project:
 
@@ -117,4 +117,4 @@ This project is released under the [MIT License](LICENSE).
 
 References to "DeepSeek Harness" identify the upstream open-source project that this desktop distribution works with. The name and related marks belong to their respective owners.
 
-DSH Omni Desktop is maintained independently by the community. It does not represent DeepSeek or the upstream DeepSeek Harness team, and it should not be read as an official authorization or recommendation from them.
+dsh omni desktop is maintained independently by the community. It does not represent DeepSeek or the upstream DeepSeek Harness team, and it should not be read as an official authorization or recommendation from them.
