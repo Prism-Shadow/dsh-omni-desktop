@@ -25,11 +25,23 @@ export interface Strings {
   }
   copy: { copy: string; copied: string }
   download: {
+    eyebrow: string
     title: string
+    titleAccent: string
     subtitle: string
+    description: string
+    highlightsLabel: string
+    highlights: string[]
     downloadCta: string
     downloadCtaFor: (platform: string) => string
     recommended: string
+    platformTitle: string
+    platformHint: string
+    previewKicker: string
+    screenshotTitle: string
+    screenshotHint: string
+    screenshotAlt: string
+    previewTags: string[]
     platforms: {
       mac: { name: string; require: string }
       windows: { name: string; require: string }
@@ -43,6 +55,7 @@ export interface Strings {
     checksums: string
     allReleases: string
     faq: {
+      kicker: string
       title: string
       intro: string
       mac: { question: string; why: string; stepDrag: string; stepTerminal: string; stepPaste: string; stepOpen: string }
@@ -55,7 +68,7 @@ export interface Strings {
 }
 
 export const zh: Strings = {
-  siteName: 'DeepSeek Harness',
+  siteName: 'DSH Omni Desktop',
 
   nav: {
     docs: '文档',
@@ -66,23 +79,35 @@ export const zh: Strings = {
   lang: { label: '语言', zh: '中文', en: 'English', system: '跟随系统' },
 
   footer: {
-    tagline: '开源的 Agent 开发框架，一切皆插件。',
+    tagline: '全模态 DSH 桌面客户端。',
     resources: '资源',
     repo: 'GitHub 仓库',
     docs: '文档',
     releases: '发布记录',
     license: '开源协议',
-    copyright: 'DeepSeek Harness · MIT License',
+    copyright: 'DSH Omni Desktop · MIT License',
   },
 
   copy: { copy: '复制', copied: '已复制' },
 
   download: {
-    title: '下载桌面版',
-    subtitle: '完整的 Web 体验打包为独立应用：内嵌 Node 运行时与本地服务，打开即用——无需安装 Node、无需命令行。',
-    downloadCta: '下载桌面版',
-    downloadCtaFor: (platform: string) => `下载桌面版（${platform}）`,
+    eyebrow: '全模态 DSH 桌面客户端',
+    title: 'DSH OMNI',
+    titleAccent: 'DESKTOP.',
+    subtitle: '把多模态对话、工具调用与本地运行环境收束为一个桌面入口。',
+    description: 'DSH Omni Desktop 面向日常开发与 Agent 工作流：内嵌 Node 运行时与本地服务，保留完整 Web 体验，安装后即可启动，无需再手动配置命令行环境。',
+    highlightsLabel: '核心能力',
+    highlights: ['桌面端完整 Web 体验', '内置运行时与本地服务', '多模态工作流入口'],
+    downloadCta: '下载桌面客户端',
+    downloadCtaFor: (platform: string) => `下载 ${platform} 客户端`,
     recommended: '当前系统',
+    platformTitle: '选择安装包',
+    platformHint: '保留全部平台下载入口',
+    previewKicker: 'DESKTOP_PREVIEW::OMNI',
+    screenshotTitle: '桌面端截图位',
+    screenshotHint: 'DSH Omni Desktop 实际产品截图',
+    screenshotAlt: 'DSH Omni Desktop 桌面客户端界面截图',
+    previewTags: ['全模态', '本地运行', '插件化'],
     platforms: {
       mac: { name: 'macOS', require: 'macOS 11 及以上，dmg 安装镜像（按芯片选择）' },
       windows: { name: 'Windows', require: 'Windows 10 及以上（x64），NSIS 安装程序' },
@@ -96,12 +121,13 @@ export const zh: Strings = {
     checksums: '校验和（SHA256SUMS.desktop）',
     allReleases: '全部版本',
     faq: {
-      title: '首次启动常见问题',
+      kicker: '首次启动',
+      title: '启动提示',
       intro: '当前构建暂未签名，系统可能拦截首次启动——按对应系统的步骤解除即可，只需操作一次。',
       mac: {
-        question: 'macOS 提示「DeepSeek Harness」已损坏，无法打开？',
+        question: 'macOS 提示应用已损坏，无法打开？',
         why: 'macOS 会给从网络下载的文件加上隔离标记，应用未签名时会因此被误报「已损坏」。删除该标记即可解除：',
-        stepDrag: '打开下载的 dmg，把 DeepSeek Harness 拖入「应用程序（Applications）」文件夹。',
+        stepDrag: '打开下载的 dmg，把应用拖入「应用程序（Applications）」文件夹。',
         stepTerminal: '打开终端：「启动台 → 其他 → 终端」。',
         stepPaste: '在终端粘贴这条命令并回车，然后输入开机密码（输入时屏幕不显示字符，输完回车即可）：',
         stepOpen: '执行完成后，双击即可正常打开应用。',
