@@ -1,6 +1,8 @@
-# Desktop Release: a v* tag (or a manual dispatch naming one) builds the three-OS
-# Electron installers, publishes them to a GitHub Release, and mirrors the exact
-# bytes to Alibaba Cloud OSS.
+# Desktop Release: a v* tag builds the three-OS Electron installers, publishes
+# them to a GitHub Release, and mirrors the exact bytes to Alibaba Cloud OSS.
+# Manual dispatches can run the same path in test mode: they publish a GitHub
+# prerelease for the requested tag and mirror it to OSS without updating the
+# public latest.json pointer.
 #
 # The build matrix is inlined rather than a reusable workflow: a tag-triggered run
 # resolves `uses: ./.github/workflows/...` from the default branch, which may not
@@ -36,6 +38,14 @@ on:
       tag:
         description: "Release tag (e.g. v0.1.0)"
         required: true
+      releaseMode:
+        description: "production updates latest.json; test creates a prerelease and skips latest.json."
+        required: false
+        type: choice
+        default: test
+        options:
+          - test
+          - production
 
 permissions:
   contents: read
@@ -98,10 +108,11 @@ jobs:
         with:
           persist-credentials: false
           submodules: true
-          # On manual dispatch, build from the tag itself, not the selected branch
-          # HEAD: a tag whose Release is missing rebuilds from the tag's own source.
-          # Tag pushes check out the pushed tag with the default (empty) ref.
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || '' }}
+          # Manual production dispatches rebuild from the tag itself. Manual test
+          # dispatches build the selected workflow ref and create a prerelease tag
+          # from that commit, so a full upload path can run before a production tag
+          # exists. Tag pushes check out the pushed tag with the default empty ref.
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.releaseMode == 'production' && inputs.tag || '' }}
 
       - name: Sync upstream workspace
         shell: pwsh
@@ -224,10 +235,38 @@ jobs:
           done
           sha256sum -- "${expected[@]}" > SHA256SUMS.desktop
 
+      - name: Resolve release mode
+        id: release_mode
+        env:
+          RELEASE_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.releaseMode || 'production' }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          set -eu
+          case "$RELEASE_MODE" in
+            test)
+              echo "prerelease=true" >> "$GITHUB_OUTPUT"
+              echo "make_latest=false" >> "$GITHUB_OUTPUT"
+              echo "name=DSH Desktop test $TAG" >> "$GITHUB_OUTPUT"
+              ;;
+            production)
+              echo "prerelease=false" >> "$GITHUB_OUTPUT"
+              echo "make_latest=true" >> "$GITHUB_OUTPUT"
+              echo "name=DSH Desktop $TAG" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "error: unsupported releaseMode: $RELEASE_MODE" >&2
+              exit 1
+              ;;
+          esac
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ steps.release_mode.outputs.name }}
+          prerelease: ${{ steps.release_mode.outputs.prerelease }}
+          make_latest: ${{ steps.release_mode.outputs.make_latest }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
@@ -321,7 +360,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          RELEASE_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.releaseMode || 'production' }}
         run: |
+          if [ "$RELEASE_MODE" = "test" ]; then
+            echo "update=false" >> "$GITHUB_OUTPUT"
+            echo "$TAG is a test release; mirroring artifacts without replacing latest.json."
+            exit 0
+          fi
           LATEST_TAG="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
           if [ "$TAG" = "$LATEST_TAG" ]; then
             echo "update=true" >> "$GITHUB_OUTPUT"
