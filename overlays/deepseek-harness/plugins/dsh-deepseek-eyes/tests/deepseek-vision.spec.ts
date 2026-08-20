@@ -118,12 +118,12 @@ describe('describe_image', () => {
     const result = await execute(h, { file_path: 'shot.png' }, h.agent)
     expect(result.error).toBeUndefined()
     expect(result.value?.description).toBe('a cat on a desk')
-    expect(result.value?.model).toEqual({ provider: 'google', model: 'gemini-3.1-flash-lite' })
+    expect(result.value?.model).toEqual({ provider: 'google', model: 'gemini-3.5-flash-lite' })
     expect(h.saveImage).toHaveBeenCalledOnce()
     expect(h.readBytes).toHaveBeenCalledOnce()
     expect(h.approvalRequest).toHaveBeenCalledWith(expect.objectContaining({ toolName: 'describe_image' }))
     expect(h.appended[0]?.[0]).toBe('vision/gemini-request')
-    expect(h.appended[0]?.[1]).toMatchObject({ provider: 'google', model: 'gemini-3.1-flash-lite' })
+    expect(h.appended[0]?.[1]).toMatchObject({ provider: 'google', model: 'gemini-3.5-flash-lite' })
   })
 
   it('resolves an attachment_id from the session log without touching the filesystem', async () => {

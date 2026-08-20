@@ -1,0 +1,246 @@
+name: Plugin Release
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/plugin-release.yml"
+      - "overlays/deepseek-harness/apps/desktop/src/main.ts"
+      - "overlays/deepseek-harness/package.json"
+      - "overlays/deepseek-harness/pnpm-lock.yaml"
+      - "overlays/deepseek-harness/pnpm-workspace.yaml"
+      - "overlays/deepseek-harness/plugins/**"
+      - "overlays/deepseek-harness/scripts/verify-desktop-profile-plugin-versions.mjs"
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Plugin package to publish"
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - "@prismshadow/dsh-deepseek-eyes"
+          - "@prismshadow/dsh-penguin-llm-router"
+      dryRun:
+        description: "Run validation and npm publish --dry-run without publishing"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  CI: "true"
+  PRIMARY_NODE_VERSION: "24"
+  DSH_TELEMETRY_DISABLED: "1"
+  PLUGIN_PACKAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.package || 'all' }}
+
+jobs:
+  validate:
+    name: Validate npm package
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: .work/ci/deepseek-harness
+    permissions:
+      contents: read
+    steps:
+      - name: Require main branch for production publish
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.dryRun && github.ref != 'refs/heads/main' }}
+        working-directory: .
+        run: |
+          echo "error: production npm publishing must run from main." >&2
+          exit 1
+
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: true
+
+      - name: Sync upstream workspace
+        shell: pwsh
+        working-directory: .
+        run: ./scripts/sync-harness.ps1 -Workspace .work/ci/deepseek-harness
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace libraries
+        run: pnpm run build:lib
+
+      - name: Verify desktop profile plugin versions
+        run: pnpm run verify:desktop-profile-plugin-versions
+
+      - name: Build, test, and dry-run publish selected plugins
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          selected_packages() {
+            case "$PLUGIN_PACKAGE" in
+              all)
+                printf '%s\n' \
+                  '@prismshadow/dsh-deepseek-eyes' \
+                  '@prismshadow/dsh-penguin-llm-router'
+                ;;
+              @prismshadow/dsh-deepseek-eyes|@prismshadow/dsh-penguin-llm-router)
+                printf '%s\n' "$PLUGIN_PACKAGE"
+                ;;
+              *)
+                echo "error: unsupported plugin package: $PLUGIN_PACKAGE" >&2
+                exit 1
+                ;;
+            esac
+          }
+
+          plugin_dir() {
+            case "$1" in
+              @prismshadow/dsh-deepseek-eyes) echo "plugins/dsh-deepseek-eyes" ;;
+              @prismshadow/dsh-penguin-llm-router) echo "plugins/dsh-penguin-llm-router" ;;
+              *)
+                echo "error: unsupported plugin package: $1" >&2
+                exit 1
+                ;;
+            esac
+          }
+
+          while IFS= read -r package_name; do
+            dir="$(plugin_dir "$package_name")"
+            version="$(node -p "require('./$dir/package.json').version")"
+
+            if npm view "$package_name@$version" version >/dev/null 2>&1; then
+              echo "$package_name@$version already exists on npm; validating package contents with npm pack --dry-run."
+              package_exists=true
+            else
+              echo "$package_name@$version is not published yet."
+              package_exists=false
+            fi
+
+            pnpm --filter "$package_name" run build
+            pnpm --filter "$package_name" test
+
+            (
+              cd "$dir"
+              if [ "$package_exists" = true ]; then
+                npm pack --dry-run
+              else
+                npm publish --dry-run --access public
+              fi
+            )
+          done < <(selected_packages)
+
+  publish:
+    name: Publish npm package
+    needs: validate
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.dryRun && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: dsh-plugin-npm-production
+      cancel-in-progress: false
+    environment:
+      name: npm-production
+    defaults:
+      run:
+        working-directory: .work/ci/deepseek-harness
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: true
+
+      - name: Sync upstream workspace
+        shell: pwsh
+        working-directory: .
+        run: ./scripts/sync-harness.ps1 -Workspace .work/ci/deepseek-harness
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace libraries
+        run: pnpm run build:lib
+
+      - name: Verify desktop profile plugin versions
+        run: pnpm run verify:desktop-profile-plugin-versions
+
+      - name: Publish selected plugins
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          selected_packages() {
+            case "$PLUGIN_PACKAGE" in
+              all)
+                printf '%s\n' \
+                  '@prismshadow/dsh-deepseek-eyes' \
+                  '@prismshadow/dsh-penguin-llm-router'
+                ;;
+              @prismshadow/dsh-deepseek-eyes|@prismshadow/dsh-penguin-llm-router)
+                printf '%s\n' "$PLUGIN_PACKAGE"
+                ;;
+              *)
+                echo "error: unsupported plugin package: $PLUGIN_PACKAGE" >&2
+                exit 1
+                ;;
+            esac
+          }
+
+          plugin_dir() {
+            case "$1" in
+              @prismshadow/dsh-deepseek-eyes) echo "plugins/dsh-deepseek-eyes" ;;
+              @prismshadow/dsh-penguin-llm-router) echo "plugins/dsh-penguin-llm-router" ;;
+              *)
+                echo "error: unsupported plugin package: $1" >&2
+                exit 1
+                ;;
+            esac
+          }
+
+          packages=()
+          while IFS= read -r package_name; do
+            packages+=("$package_name")
+          done < <(selected_packages)
+
+          for package_name in "${packages[@]}"; do
+            dir="$(plugin_dir "$package_name")"
+            version="$(node -p "require('./$dir/package.json').version")"
+            if npm view "$package_name@$version" version >/dev/null 2>&1; then
+              echo "error: $package_name@$version is already published on npm." >&2
+              exit 1
+            fi
+          done
+
+          for package_name in "${packages[@]}"; do
+            dir="$(plugin_dir "$package_name")"
+            pnpm --filter "$package_name" run build
+            pnpm --filter "$package_name" test
+            (
+              cd "$dir"
+              npm publish --access public
+            )
+          done

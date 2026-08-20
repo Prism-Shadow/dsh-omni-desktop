@@ -47,7 +47,7 @@ const IMAGE_EXTENSIONS: Readonly<Record<string, ImageMediaType>> = {
 
 /** The platform Gemini route the subcall resolves through (pi-ai route key + catalog model). */
 const DEFAULT_PROVIDER = 'google'
-const DEFAULT_MODEL = 'gemini-3.1-flash-lite'
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite'
 const DEFAULT_MAX_TOKENS = 1024
 
 /** Stable vision-prompt instruction: return a plain-language description only. */

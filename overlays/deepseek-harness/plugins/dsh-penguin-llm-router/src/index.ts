@@ -99,7 +99,7 @@ const DEFAULT_PLATFORM_BASE_URL = 'https://token.penguin.ooo'
 
 /** Model route the vision subcall (`describe_image`) resolves through pi-ai. */
 const VISION_PROVIDER = 'google'
-const VISION_MODEL = 'gemini-2.5-flash'
+const VISION_MODEL = 'gemini-3.5-flash-lite'
 
 /**
  * Platform login orchestration and account status. Exposed to the Web client
