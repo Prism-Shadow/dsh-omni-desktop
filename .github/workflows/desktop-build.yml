@@ -37,7 +37,7 @@ jobs:
           # Apple Silicon and Intel installers; stage.mjs bundles a matching Node
           # runtime per architecture for them.
           - name: macOS
-            os: macos-26-arm64
+            os: macos-26
             electronBuilderArgs: --mac
             artifactPath: |
               .work/ci/deepseek-harness/apps/desktop/stage/out/*.dmg

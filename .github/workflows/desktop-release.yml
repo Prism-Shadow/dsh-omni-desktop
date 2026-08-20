@@ -93,7 +93,7 @@ jobs:
           # apps/desktop/scripts/stage.mjs), so each installer's embedded server
           # runtime matches its target.
           - name: macOS
-            os: macos-26-arm64
+            os: macos-26
             electronBuilderArgs: --mac
           - name: Linux x64
             os: ubuntu-24.04
