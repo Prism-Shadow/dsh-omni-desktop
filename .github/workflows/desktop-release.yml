@@ -16,12 +16,11 @@
 #
 # OSS mirroring uses GitHub OIDC against Alibaba Cloud. The GitHub Environment
 # oss-production supplies ALIYUN_OIDC_PROVIDER_ARN, ALIYUN_ROLE_ARN, OSS_BUCKET,
-# OSS_REGION, OSS_ENDPOINT, and OSS_PUBLIC_BASE_URL. DSH_DESKTOP_UPDATE_BASE_URL
-# is a repository or organization variable that tells electron-builder where the
-# generated latest*.yml files will be served. Objects land under immutable
+# OSS_REGION, OSS_ENDPOINT, and OSS_PUBLIC_BASE_URL. Objects land under immutable
 # releases/<tag>/ keys; latest.json is uploaded last and only while the tag is
-# still GitHub's current latest Release. The OIDC provider on the Alibaba Cloud
-# side must trust this repository's environment-scoped subject for
+# still GitHub's current latest Release. Electron updater metadata is not
+# published until the updater plugin is included. The OIDC provider on the
+# Alibaba Cloud side must trust this repository's environment-scoped subject for
 # oss-production (including immutable owner/repo ids when GitHub emits them) and
 # the github-actions audience.
 #
@@ -163,14 +162,15 @@ jobs:
         env:
           DSH_DESKTOP_UPDATE_BASE_URL: ${{ vars.DSH_DESKTOP_UPDATE_BASE_URL }}
         run: |
-          case "$DSH_DESKTOP_UPDATE_BASE_URL" in
-            https://*) ;;
-            *) echo "error: DSH_DESKTOP_UPDATE_BASE_URL must be configured as an https URL" >&2; exit 1 ;;
-          esac
-          pnpm --dir apps/desktop exec electron-builder ${{ matrix.electronBuilderArgs }} \
-            --config.publish.provider=generic \
-            --config.publish.url="$DSH_DESKTOP_UPDATE_BASE_URL" \
-            --publish never
+          publish_args=()
+          if [ -n "$DSH_DESKTOP_UPDATE_BASE_URL" ]; then
+            case "$DSH_DESKTOP_UPDATE_BASE_URL" in
+              https://*) ;;
+              *) echo "error: DSH_DESKTOP_UPDATE_BASE_URL must be an https URL when set" >&2; exit 1 ;;
+            esac
+            publish_args=(--config.publish.provider=generic --config.publish.url="$DSH_DESKTOP_UPDATE_BASE_URL")
+          fi
+          pnpm --dir apps/desktop exec electron-builder ${{ matrix.electronBuilderArgs }} "${publish_args[@]}" --publish never
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -182,8 +182,6 @@ jobs:
             .work/ci/deepseek-harness/apps/desktop/stage/out/*.zip
             .work/ci/deepseek-harness/apps/desktop/stage/out/*.AppImage
             .work/ci/deepseek-harness/apps/desktop/stage/out/*.deb
-            .work/ci/deepseek-harness/apps/desktop/stage/out/*.blockmap
-            .work/ci/deepseek-harness/apps/desktop/stage/out/latest*.yml
           if-no-files-found: error
           retention-days: 14
 
@@ -201,10 +199,9 @@ jobs:
           merge-multiple: true
           path: desktop-artifacts
 
-      # Checksums over the exact asset list: a missing installer or update metadata
-      # file fails the run before the immutable Release is published. sort -u drops
-      # the blockmap entries the explicit list and the *.blockmap glob both name.
-      # The OSS mirror script re-verifies the same list.
+      # Checksums over the exact installer list: a missing artifact fails the run
+      # before the immutable Release is published. The OSS mirror script
+      # re-verifies the same list.
       - name: Generate desktop checksums
         shell: bash
         run: |
@@ -212,18 +209,12 @@ jobs:
           cd desktop-artifacts
           expected=(
             deepseek-harness-desktop-win32-x64.exe
-            deepseek-harness-desktop-win32-x64.exe.blockmap
-            latest.yml
             deepseek-harness-desktop-darwin-arm64.dmg
             deepseek-harness-desktop-darwin-arm64.zip
             deepseek-harness-desktop-darwin-x64.dmg
             deepseek-harness-desktop-darwin-x64.zip
-            deepseek-harness-desktop-darwin-arm64.zip.blockmap
-            deepseek-harness-desktop-darwin-x64.zip.blockmap
-            latest-mac.yml
             deepseek-harness-desktop-linux-x86_64.AppImage
             deepseek-harness-desktop-linux-amd64.deb
-            latest-linux.yml
           )
           for file in "${expected[@]}"; do
             if [ ! -f "$file" ]; then
@@ -231,9 +222,7 @@ jobs:
               exit 1
             fi
           done
-          sha256sum -- "${expected[@]}" *.blockmap \
-            | sort -u -k2 \
-            > SHA256SUMS.desktop
+          sha256sum -- "${expected[@]}" > SHA256SUMS.desktop
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
@@ -243,16 +232,12 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             desktop-artifacts/deepseek-harness-desktop-win32-x64.exe
-            desktop-artifacts/latest.yml
             desktop-artifacts/deepseek-harness-desktop-darwin-arm64.dmg
             desktop-artifacts/deepseek-harness-desktop-darwin-arm64.zip
             desktop-artifacts/deepseek-harness-desktop-darwin-x64.dmg
             desktop-artifacts/deepseek-harness-desktop-darwin-x64.zip
-            desktop-artifacts/latest-mac.yml
             desktop-artifacts/deepseek-harness-desktop-linux-x86_64.AppImage
             desktop-artifacts/deepseek-harness-desktop-linux-amd64.deb
-            desktop-artifacts/latest-linux.yml
-            desktop-artifacts/*.blockmap
             desktop-artifacts/SHA256SUMS.desktop
 
   mirror-oss:

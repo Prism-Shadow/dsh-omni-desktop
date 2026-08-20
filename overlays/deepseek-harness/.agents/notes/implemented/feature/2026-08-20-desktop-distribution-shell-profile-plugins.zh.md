@@ -30,4 +30,4 @@ Profile 插件是第三方 registry 包，不是 Harness 包。启动时，桌�
 
 ## Consequences
 
-桌面应用新增了依赖构建产物和本地 tarball 暂存的打包面，所以发布打包必须先构建 Harness，不能只通过编译 Electron 入口验证。首次启动或桌面管理插件版本变化时，可能因为 registry 插件安装而变慢；网络或 registry 失败会降级到当前 Web profile 并记录日志，而不是阻止应用启动。带有这些插件的 profile 在冷启动时也可能更晚输出就绪 URL，所以桌面壳会等待更久，并在失败时清理子进程树，避免留下迟到启动的 Web 进程。Auto-update 元数据和下载链接会保持禁用，直到发布仓库和公开镜像来源完成配置。因此 release workflow 有一个必需的运维变量 `DSH_DESKTOP_UPDATE_BASE_URL`，landing 构建有两个可选的桌面下载公开变量。
+桌面应用新增了依赖构建产物和本地 tarball 暂存的打包面，所以发布打包必须先构建 Harness，不能只通过编译 Electron 入口验证。首次启动或桌面管理插件版本变化时，可能因为 registry 插件安装而变慢；网络或 registry 失败会降级到当前 Web profile 并记录日志，而不是阻止应用启动。带有这些插件的 profile 在冷启动时也可能更晚输出就绪 URL，所以桌面壳会等待更久，并在失败时清理子进程树，避免留下迟到启动的 Web 进程。Auto-update 元数据会保持禁用，直到 updater 插件纳入；发布下载只要求公开镜像来源。Landing 构建有两个可选的桌面下载公开变量。

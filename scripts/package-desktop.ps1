@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [string]$UpdateBaseUrl = 'https://updates.example.invalid/dsh-omni-desktop',
+  [string]$UpdateBaseUrl = '',
   [string]$Workspace,
   [switch]$SkipInstall
 )
@@ -43,18 +43,22 @@ try {
   }
 
   Invoke-CommandChecked -FilePath 'pnpm' -Arguments @('--workspace-root', 'run', 'stage:desktop') -WorkingDirectory $workspace
-  Invoke-CommandChecked -FilePath 'pnpm' -Arguments @(
+  $electronBuilderArgs = @(
     '--dir',
     'apps/desktop',
     'exec',
     'electron-builder',
     '--win',
-    '--x64',
-    '--config.publish.provider=generic',
-    "--config.publish.url=$UpdateBaseUrl",
-    '--publish',
-    'never'
-  ) -WorkingDirectory $workspace
+    '--x64'
+  )
+  if (-not [string]::IsNullOrWhiteSpace($UpdateBaseUrl)) {
+    if (-not $UpdateBaseUrl.StartsWith('https://', [System.StringComparison]::OrdinalIgnoreCase)) {
+      throw 'UpdateBaseUrl must be an https URL when set.'
+    }
+    $electronBuilderArgs += @('--config.publish.provider=generic', "--config.publish.url=$UpdateBaseUrl")
+  }
+  $electronBuilderArgs += @('--publish', 'never')
+  Invoke-CommandChecked -FilePath 'pnpm' -Arguments $electronBuilderArgs -WorkingDirectory $workspace
 } finally {
   if ($null -eq $previousCi) {
     Remove-Item Env:\CI -ErrorAction SilentlyContinue

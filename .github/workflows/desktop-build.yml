@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       updateBaseUrl:
-        description: Generic electron-updater base URL for generated latest*.yml files.
-        required: true
+        description: Optional generic electron-updater base URL for future updater builds.
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -32,8 +33,6 @@ jobs:
             electronBuilderArgs: --win --x64
             artifactPath: |
               .work/ci/deepseek-harness/apps/desktop/stage/out/*.exe
-              .work/ci/deepseek-harness/apps/desktop/stage/out/*.blockmap
-              .work/ci/deepseek-harness/apps/desktop/stage/out/latest*.yml
           # The arm64 runner also packages the x64 target, so one job produces the
           # Apple Silicon and Intel installers; stage.mjs bundles a matching Node
           # runtime per architecture for them.
@@ -43,15 +42,12 @@ jobs:
             artifactPath: |
               .work/ci/deepseek-harness/apps/desktop/stage/out/*.dmg
               .work/ci/deepseek-harness/apps/desktop/stage/out/*.zip
-              .work/ci/deepseek-harness/apps/desktop/stage/out/*.blockmap
-              .work/ci/deepseek-harness/apps/desktop/stage/out/latest*.yml
           - name: Linux x64
             os: ubuntu-24.04
             electronBuilderArgs: --linux --x64
             artifactPath: |
               .work/ci/deepseek-harness/apps/desktop/stage/out/*.AppImage
               .work/ci/deepseek-harness/apps/desktop/stage/out/*.deb
-              .work/ci/deepseek-harness/apps/desktop/stage/out/latest*.yml
     defaults:
       run:
         working-directory: .work/ci/deepseek-harness
@@ -112,14 +108,15 @@ jobs:
         env:
           DSH_DESKTOP_UPDATE_BASE_URL: ${{ inputs.updateBaseUrl }}
         run: |
-          case "$DSH_DESKTOP_UPDATE_BASE_URL" in
-            https://*) ;;
-            *) echo "error: updateBaseUrl must be an https URL" >&2; exit 1 ;;
-          esac
-          pnpm --dir apps/desktop exec electron-builder ${{ matrix.electronBuilderArgs }} \
-            --config.publish.provider=generic \
-            --config.publish.url="$DSH_DESKTOP_UPDATE_BASE_URL" \
-            --publish never
+          publish_args=()
+          if [ -n "$DSH_DESKTOP_UPDATE_BASE_URL" ]; then
+            case "$DSH_DESKTOP_UPDATE_BASE_URL" in
+              https://*) ;;
+              *) echo "error: updateBaseUrl must be an https URL when set" >&2; exit 1 ;;
+            esac
+            publish_args=(--config.publish.provider=generic --config.publish.url="$DSH_DESKTOP_UPDATE_BASE_URL")
+          fi
+          pnpm --dir apps/desktop exec electron-builder ${{ matrix.electronBuilderArgs }} "${publish_args[@]}" --publish never
 
       - uses: actions/upload-artifact@v4
         with:

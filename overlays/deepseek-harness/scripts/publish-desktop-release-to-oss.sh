@@ -4,9 +4,9 @@
 # Usage: publish-desktop-release-to-oss.sh <release-dir> <tag> [update-latest]
 #   update-latest: true only when <tag> is GitHub's current latest Release.
 #
-# Object layout: installers, electron-updater metadata, and the checksum list land
-# under immutable releases/<tag>/ keys; latest.json at the bucket root points at the
-# newest release and is written last, only while <tag> is still GitHub's latest.
+# Object layout: installers and the checksum list land under immutable
+# releases/<tag>/ keys; latest.json at the bucket root points at the newest
+# release and is written last, only while <tag> is still GitHub's latest.
 #
 # Required environment:
 #   OSS_BUCKET, OSS_REGION, OSS_ENDPOINT, OSS_PUBLIC_BASE_URL and temporary
@@ -79,27 +79,9 @@ deepseek-harness-desktop-darwin-x64.zip
 deepseek-harness-desktop-linux-x86_64.AppImage
 deepseek-harness-desktop-linux-amd64.deb
 "
-UPDATE_METADATA="
-latest.yml
-latest-mac.yml
-latest-linux.yml
-"
-REQUIRED_BLOCKMAPS="
-deepseek-harness-desktop-win32-x64.exe.blockmap
-deepseek-harness-desktop-darwin-arm64.zip.blockmap
-deepseek-harness-desktop-darwin-x64.zip.blockmap
-"
 FILES="$INSTALLERS
-$UPDATE_METADATA
-$REQUIRED_BLOCKMAPS
 SHA256SUMS.desktop
 "
-PRESENT_BLOCKMAPS="$(
-  for path in "$RELEASE_DIR"/*.blockmap; do
-    [ -f "$path" ] || continue
-    basename "$path"
-  done | LC_ALL=C sort
-)"
 
 for file in $FILES; do
   [ -f "$RELEASE_DIR/$file" ] || {
@@ -192,12 +174,6 @@ upload_immutable_file() {
 
 RELEASE_PREFIX="releases/$TAG"
 for file in $FILES; do
-  upload_immutable_file "$RELEASE_DIR/$file" "$RELEASE_PREFIX/$file"
-done
-for file in $PRESENT_BLOCKMAPS; do
-  case " $FILES " in
-    *" $file "*) continue ;;
-  esac
   upload_immutable_file "$RELEASE_DIR/$file" "$RELEASE_PREFIX/$file"
 done
 
