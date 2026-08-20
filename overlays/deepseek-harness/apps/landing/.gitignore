@@ -1,0 +1,7 @@
+node_modules
+dist
+# tsc build output (apps/landing/lib); anchored so src/lib/ stays tracked.
+/lib
+# The repo root .gitignore's bare `lib/` also matches src/lib/; re-include it so
+# the landing source stays tracked.
+!src/lib/

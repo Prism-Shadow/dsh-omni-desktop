@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.client.tsbuildinfo"
+  },
+  "files": [
+    "src/client/index.ts",
+    "src/client/auth-controller.ts",
+    "src/client/AuthFooterAction.tsx",
+    "src/client/login-flow.ts",
+    "src/client/PlatformAccountSection.tsx",
+    "src/client/contract/remote.ts",
+    "src/client/contract/slots.ts",
+    "src/client/css-modules.d.ts"
+  ]
+}

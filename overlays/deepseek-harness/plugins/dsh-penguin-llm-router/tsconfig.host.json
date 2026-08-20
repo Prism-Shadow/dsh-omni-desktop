@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
+  },
+  "files": [
+    "src/client/contract/remote.ts",
+    "src/client/contract/slots.ts",
+    "src/index.ts",
+    "src/invariant.ts",
+    "src/platform-client.ts",
+    "src/typert.ts",
+    "src/types.ts"
+  ]
+}

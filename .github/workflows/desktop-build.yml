@@ -1,0 +1,130 @@
+name: Desktop Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      updateBaseUrl:
+        description: Generic electron-updater base URL for generated latest*.yml files.
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  PRIMARY_NODE_VERSION: '24'
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  package:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-2025
+            electronBuilderArgs: --win --x64
+            artifactPath: |
+              .work/ci/deepseek-harness/apps/desktop/stage/out/*.exe
+              .work/ci/deepseek-harness/apps/desktop/stage/out/*.blockmap
+              .work/ci/deepseek-harness/apps/desktop/stage/out/latest*.yml
+          # The arm64 runner also packages the x64 target, so one job produces the
+          # Apple Silicon and Intel installers; stage.mjs bundles a matching Node
+          # runtime per architecture for them.
+          - name: macOS
+            os: macos-26-arm64
+            electronBuilderArgs: --mac
+            artifactPath: |
+              .work/ci/deepseek-harness/apps/desktop/stage/out/*.dmg
+              .work/ci/deepseek-harness/apps/desktop/stage/out/*.zip
+              .work/ci/deepseek-harness/apps/desktop/stage/out/*.blockmap
+              .work/ci/deepseek-harness/apps/desktop/stage/out/latest*.yml
+          - name: Linux x64
+            os: ubuntu-24.04
+            electronBuilderArgs: --linux --x64
+            artifactPath: |
+              .work/ci/deepseek-harness/apps/desktop/stage/out/*.AppImage
+              .work/ci/deepseek-harness/apps/desktop/stage/out/*.deb
+              .work/ci/deepseek-harness/apps/desktop/stage/out/latest*.yml
+    defaults:
+      run:
+        working-directory: .work/ci/deepseek-harness
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: true
+
+      - name: Sync upstream workspace
+        shell: pwsh
+        working-directory: .
+        run: ./scripts/sync-harness.ps1 -Workspace .work/ci/deepseek-harness
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Configure pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: |
+          store_root="$HOME/.local/share/pnpm/store"
+          echo "PNPM_CONFIG_STORE_DIR=$store_root" >> "$GITHUB_ENV"
+          store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('.work/ci/deepseek-harness/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
+
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fakeroot dpkg rpm
+          sudo apt-get install -y --no-install-recommends libfuse2t64 || sudo apt-get install -y --no-install-recommends libfuse2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build desktop sources
+        run: pnpm run build:desktop
+
+      - name: Stage desktop app
+        run: node apps/desktop/scripts/stage.mjs
+
+      - name: Package desktop app
+        shell: bash
+        env:
+          DSH_DESKTOP_UPDATE_BASE_URL: ${{ inputs.updateBaseUrl }}
+        run: |
+          case "$DSH_DESKTOP_UPDATE_BASE_URL" in
+            https://*) ;;
+            *) echo "error: updateBaseUrl must be an https URL" >&2; exit 1 ;;
+          esac
+          pnpm --dir apps/desktop exec electron-builder ${{ matrix.electronBuilderArgs }} \
+            --config.publish.provider=generic \
+            --config.publish.url="$DSH_DESKTOP_UPDATE_BASE_URL" \
+            --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          # The desktop release workflow collects these by the desktop-* prefix.
+          name: desktop-${{ runner.os }}
+          path: ${{ matrix.artifactPath }}
+          if-no-files-found: error
+          retention-days: 14

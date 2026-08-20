@@ -1,0 +1,358 @@
+# Desktop Release: a v* tag (or a manual dispatch naming one) builds the three-OS
+# Electron installers, publishes them to a GitHub Release, and mirrors the exact
+# bytes to Alibaba Cloud OSS.
+#
+# The build matrix is inlined rather than a reusable workflow: a tag-triggered run
+# resolves `uses: ./.github/workflows/...` from the default branch, which may not
+# carry the called workflow, while a self-contained workflow runs entirely from the
+# tag. .github/workflows/desktop-build.yml keeps the same matrix for standalone
+# dry runs; a packaging change must update both files.
+#
+# Releases are immutable: once published, assets can never be replaced. check-release
+# gates the release job on the tag's Release not existing — dispatching an
+# already-released tag skips the GitHub build/upload while still retrying the OSS
+# mirror. The npm line owns its dsh-v* tags; those do not match v*, so the two
+# release lines stay independent.
+#
+# OSS mirroring uses GitHub OIDC against Alibaba Cloud. The GitHub Environment
+# oss-production supplies ALIYUN_OIDC_PROVIDER_ARN, ALIYUN_ROLE_ARN, OSS_BUCKET,
+# OSS_REGION, OSS_ENDPOINT, and OSS_PUBLIC_BASE_URL. DSH_DESKTOP_UPDATE_BASE_URL
+# is a repository or organization variable that tells electron-builder where the
+# generated latest*.yml files will be served. Objects land under immutable
+# releases/<tag>/ keys; latest.json is uploaded last and only while the tag is
+# still GitHub's current latest Release. The OIDC provider on the Alibaba Cloud
+# side must trust this repository (subject claim repo:<owner>/<repo>, audience
+# github-actions).
+#
+# The landing download page links these artifacts by their version-less names:
+# the version lives in the tag and SHA256SUMS.desktop.
+name: Desktop Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  CI: 'true'
+  PRIMARY_NODE_VERSION: '24'
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  check-release:
+    name: Check release state
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  package:
+    name: ${{ matrix.name }}
+    needs: check-release
+    if: needs.check-release.outputs.exists != 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-2025
+            electronBuilderArgs: --win --x64
+          # The arm64 runner also packages the x64 target, so one job produces the
+          # Apple Silicon and Intel installers the release publishes together. The
+          # stage bundles a matching Node runtime per architecture (see
+          # apps/desktop/scripts/stage.mjs), so each installer's embedded server
+          # runtime matches its target.
+          - name: macOS
+            os: macos-26-arm64
+            electronBuilderArgs: --mac
+          - name: Linux x64
+            os: ubuntu-24.04
+            electronBuilderArgs: --linux --x64
+    defaults:
+      run:
+        working-directory: .work/ci/deepseek-harness
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: true
+          # On manual dispatch, build from the tag itself, not the selected branch
+          # HEAD: a tag whose Release is missing rebuilds from the tag's own source.
+          # Tag pushes check out the pushed tag with the default (empty) ref.
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || '' }}
+
+      - name: Sync upstream workspace
+        shell: pwsh
+        working-directory: .
+        run: ./scripts/sync-harness.ps1 -Workspace .work/ci/deepseek-harness
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Configure pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: |
+          store_root="$HOME/.local/share/pnpm/store"
+          echo "PNPM_CONFIG_STORE_DIR=$store_root" >> "$GITHUB_ENV"
+          store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('.work/ci/deepseek-harness/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
+
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fakeroot dpkg rpm
+          sudo apt-get install -y --no-install-recommends libfuse2t64 || sudo apt-get install -y --no-install-recommends libfuse2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Stamp the tag into the workspace-root manifest before staging: stage.mjs
+      # records that version in the staged app manifest, which electron-builder
+      # reads for installer metadata. A tag-push of an unbumped repo fails here.
+      - name: Stamp release version
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/stamp-desktop-version.mjs
+
+      - name: Build desktop sources
+        run: pnpm run build:desktop
+
+      - name: Stage desktop app
+        run: node apps/desktop/scripts/stage.mjs
+
+      - name: Package desktop app
+        shell: bash
+        env:
+          DSH_DESKTOP_UPDATE_BASE_URL: ${{ vars.DSH_DESKTOP_UPDATE_BASE_URL }}
+        run: |
+          case "$DSH_DESKTOP_UPDATE_BASE_URL" in
+            https://*) ;;
+            *) echo "error: DSH_DESKTOP_UPDATE_BASE_URL must be configured as an https URL" >&2; exit 1 ;;
+          esac
+          pnpm --dir apps/desktop exec electron-builder ${{ matrix.electronBuilderArgs }} \
+            --config.publish.provider=generic \
+            --config.publish.url="$DSH_DESKTOP_UPDATE_BASE_URL" \
+            --publish never
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ runner.os }}
+          path: |
+            .work/ci/deepseek-harness/apps/desktop/stage/out/*.exe
+            .work/ci/deepseek-harness/apps/desktop/stage/out/*.dmg
+            .work/ci/deepseek-harness/apps/desktop/stage/out/*.zip
+            .work/ci/deepseek-harness/apps/desktop/stage/out/*.AppImage
+            .work/ci/deepseek-harness/apps/desktop/stage/out/*.deb
+            .work/ci/deepseek-harness/apps/desktop/stage/out/*.blockmap
+            .work/ci/deepseek-harness/apps/desktop/stage/out/latest*.yml
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    needs: [check-release, package]
+    if: needs.check-release.outputs.exists != 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: desktop-artifacts
+
+      # Checksums over the exact asset list: a missing installer or update metadata
+      # file fails the run before the immutable Release is published. sort -u drops
+      # the blockmap entries the explicit list and the *.blockmap glob both name.
+      # The OSS mirror script re-verifies the same list.
+      - name: Generate desktop checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd desktop-artifacts
+          expected=(
+            deepseek-harness-desktop-win32-x64.exe
+            deepseek-harness-desktop-win32-x64.exe.blockmap
+            latest.yml
+            deepseek-harness-desktop-darwin-arm64.dmg
+            deepseek-harness-desktop-darwin-arm64.zip
+            deepseek-harness-desktop-darwin-x64.dmg
+            deepseek-harness-desktop-darwin-x64.zip
+            deepseek-harness-desktop-darwin-arm64.zip.blockmap
+            deepseek-harness-desktop-darwin-x64.zip.blockmap
+            latest-mac.yml
+            deepseek-harness-desktop-linux-x86_64.AppImage
+            deepseek-harness-desktop-linux-amd64.deb
+            latest-linux.yml
+          )
+          for file in "${expected[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "error: missing desktop release artifact: $file" >&2
+              exit 1
+            fi
+          done
+          sha256sum -- "${expected[@]}" *.blockmap \
+            | sort -u -k2 \
+            > SHA256SUMS.desktop
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            desktop-artifacts/deepseek-harness-desktop-win32-x64.exe
+            desktop-artifacts/latest.yml
+            desktop-artifacts/deepseek-harness-desktop-darwin-arm64.dmg
+            desktop-artifacts/deepseek-harness-desktop-darwin-arm64.zip
+            desktop-artifacts/deepseek-harness-desktop-darwin-x64.dmg
+            desktop-artifacts/deepseek-harness-desktop-darwin-x64.zip
+            desktop-artifacts/latest-mac.yml
+            desktop-artifacts/deepseek-harness-desktop-linux-x86_64.AppImage
+            desktop-artifacts/deepseek-harness-desktop-linux-amd64.deb
+            desktop-artifacts/latest-linux.yml
+            desktop-artifacts/*.blockmap
+            desktop-artifacts/SHA256SUMS.desktop
+
+  mirror-oss:
+    name: Mirror GitHub Release to Alibaba Cloud OSS
+    needs: [check-release, release]
+    # Retries keep working after a Release exists: skip only the release job itself,
+    # never the mirror.
+    if: >-
+      ${{ always() && needs.check-release.result == 'success' &&
+          (needs.release.result == 'success' || needs.release.result == 'skipped') }}
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: deepseek-harness-oss-production
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: .work/ci/deepseek-harness
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: oss-production
+      url: ${{ vars.OSS_PUBLIC_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: true
+
+      - name: Sync upstream workspace
+        shell: pwsh
+        working-directory: .
+        run: ./scripts/sync-harness.ps1 -Workspace .work/ci/deepseek-harness
+
+      - name: Validate OSS environment configuration
+        env:
+          ALIYUN_OIDC_PROVIDER_ARN: ${{ vars.ALIYUN_OIDC_PROVIDER_ARN }}
+          ALIYUN_ROLE_ARN: ${{ vars.ALIYUN_ROLE_ARN }}
+          OSS_BUCKET: ${{ vars.OSS_BUCKET }}
+          OSS_REGION: ${{ vars.OSS_REGION }}
+          OSS_ENDPOINT: ${{ vars.OSS_ENDPOINT }}
+          OSS_PUBLIC_BASE_URL: ${{ vars.OSS_PUBLIC_BASE_URL }}
+        run: |
+          set -eu
+          for name in ALIYUN_OIDC_PROVIDER_ARN ALIYUN_ROLE_ARN OSS_BUCKET OSS_REGION OSS_ENDPOINT OSS_PUBLIC_BASE_URL; do
+            eval "value=\${$name:-}"
+            if [ -z "$value" ]; then
+              echo "error: $name is not configured in the oss-production environment" >&2
+              exit 1
+            fi
+          done
+
+      - name: Download and verify ossutil
+        run: |
+          sh scripts/install-ossutil.sh "$RUNNER_TEMP/ossutil-bin"
+          echo "$RUNNER_TEMP/ossutil-bin" >> "$GITHUB_PATH"
+
+      # Pinned v1 commit. audience must match the client ID configured on the
+      # Alibaba Cloud OIDC provider; this project deliberately uses `github-actions`.
+      - name: Exchange GitHub OIDC token for Alibaba Cloud credentials
+        id: aliyun
+        uses: aliyun/configure-aliyun-credentials-action@1e5248c8d5d93a8781ac344a68e19a43341e79e6
+        with:
+          oidc-provider-arn: ${{ vars.ALIYUN_OIDC_PROVIDER_ARN }}
+          role-to-assume: ${{ vars.ALIYUN_ROLE_ARN }}
+          role-session-name: dsh-oss-${{ github.run_id }}
+          role-session-expiration: 1800
+          audience: github-actions
+
+      - name: Download exact GitHub Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          mkdir -p release-assets
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir release-assets
+
+      - name: Determine whether the tag is the latest Release
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          LATEST_TAG="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
+          if [ "$TAG" = "$LATEST_TAG" ]; then
+            echo "update=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "update=false" >> "$GITHUB_OUTPUT"
+            echo "$TAG will be mirrored without replacing latest.json (current latest: $LATEST_TAG)."
+          fi
+
+      - name: Mirror and verify OSS objects
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          OSS_ACCESS_KEY_ID: ${{ steps.aliyun.outputs['aliyun-access-key-id'] }}
+          OSS_ACCESS_KEY_SECRET: ${{ steps.aliyun.outputs['aliyun-access-key-secret'] }}
+          OSS_SESSION_TOKEN: ${{ steps.aliyun.outputs['aliyun-security-token'] }}
+          OSS_BUCKET: ${{ vars.OSS_BUCKET }}
+          OSS_REGION: ${{ vars.OSS_REGION }}
+          OSS_ENDPOINT: ${{ vars.OSS_ENDPOINT }}
+          OSS_PUBLIC_BASE_URL: ${{ vars.OSS_PUBLIC_BASE_URL }}
+        run: sh scripts/publish-desktop-release-to-oss.sh release-assets "$TAG" "${{ steps.latest.outputs.update }}"

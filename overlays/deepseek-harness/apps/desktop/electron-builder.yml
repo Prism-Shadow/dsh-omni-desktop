@@ -1,0 +1,54 @@
+appId: ai.deepseek.harness.desktop
+productName: DeepSeek Harness
+directories:
+  app: stage/app
+  buildResources: build
+  output: stage/out
+asar: false
+files:
+  - "**/*"
+npmRebuild: false
+nodeGypRebuild: false
+
+extraResources:
+  - from: stage/node
+    to: node
+  - from: build/icon.png
+    to: icon.png
+
+mac:
+  category: public.app-category.developer-tools
+  icon: build/icon.icns
+  identity: null
+  hardenedRuntime: false
+  notarize: false
+  artifactName: deepseek-harness-desktop-darwin-${arch}.${ext}
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+
+win:
+  icon: build/icon.ico
+  artifactName: deepseek-harness-desktop-win32-${arch}.${ext}
+  signExecutable: false
+  verifyUpdateCodeSignature: false
+  target:
+    - nsis
+
+nsis:
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+linux:
+  icon: build/icon.png
+  executableName: deepseek-harness
+  artifactName: deepseek-harness-desktop-linux-${arch}.${ext}
+  category: Development
+  maintainer: DeepSeek <support@deepseek.com>
+  target:
+    - AppImage
+    - deb

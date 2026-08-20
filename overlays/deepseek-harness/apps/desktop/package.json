@@ -1,0 +1,29 @@
+{
+  "name": "@deepseek-ai/dsh-desktop",
+  "description": "DeepSeek Harness desktop shell: Electron hosts the local dsh web server spawned on a bundled Node runtime.",
+  "version": "0.1.0-rc.8",
+  "private": true,
+  "type": "module",
+  "main": "lib/main.js",
+  "scripts": {
+    "build": "tsc -b tsconfig.json && tsdown",
+    "start": "pnpm run build && electron .",
+    "stage": "node scripts/stage.mjs",
+    "pack": "pnpm --workspace-root run stage:desktop && electron-builder --publish never",
+    "pack:dir": "pnpm --workspace-root run stage:desktop && electron-builder --dir --publish never",
+    "pack:win": "pnpm --workspace-root run stage:desktop && electron-builder --win --publish never",
+    "pack:mac": "pnpm --workspace-root run stage:desktop && electron-builder --mac --publish never",
+    "pack:linux": "pnpm --workspace-root run stage:desktop && electron-builder --linux --publish never"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh": "workspace:^",
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.0.12",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3"
+  }
+}

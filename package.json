@@ -1,0 +1,9 @@
+{
+  "name": "dsh-omni-desktop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync:harness": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-harness.ps1 -Force",
+    "package:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-desktop.ps1"
+  }
+}

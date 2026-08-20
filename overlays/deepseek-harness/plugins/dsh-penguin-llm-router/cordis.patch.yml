@@ -1,0 +1,11 @@
+# @prismshadow/dsh-penguin-llm-router bundle patch: mounts the dual-face platform
+# login plugin into a profile layer stack. The row is a bare plugin by
+# package name: the host half (exports ".") runs the platformAuth service in
+# the host process, and the `dsh.client` declaration in package.json makes
+# the browser half (exports "./client") load in the web GUI.
+# Installed with `dsh plugin --profile web add @prismshadow/dsh-penguin-llm-router`
+# (or the local link form during development); later layers override this
+# row by id.
+- insert:
+    - id: dsh-penguin-llm-router
+      name: '@prismshadow/dsh-penguin-llm-router'

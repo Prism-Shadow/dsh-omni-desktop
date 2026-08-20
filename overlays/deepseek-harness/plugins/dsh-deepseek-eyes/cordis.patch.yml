@@ -1,0 +1,11 @@
+# @prismshadow/dsh-deepseek-eyes bundle patch: mounts the dual-face vision
+# plugin into a profile layer stack. The row is a bare plugin by package
+# name: the host half (exports ".") registers the describe_image tool and
+# the paste route in the host process, and the `dsh.client` declaration in
+# package.json makes the browser half (exports "./client") load in the web
+# GUI. Installed with `dsh plugin --profile web add @prismshadow/dsh-deepseek-eyes`
+# (or the local link form during development); later layers override this
+# row by id.
+- insert:
+    - id: dsh-deepseek-eyes
+      name: '@prismshadow/dsh-deepseek-eyes'
