@@ -7,6 +7,11 @@ on:
         description: Optional generic electron-updater base URL for future updater builds.
         required: false
         default: ''
+      signMacos:
+        description: Sign and notarize macOS artifacts with the apple-signing environment.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -31,6 +36,7 @@ jobs:
           - name: Windows x64
             os: windows-2025
             electronBuilderArgs: --win --x64
+            environment: desktop-build
             artifactPath: |
               .work/ci/deepseek-harness/apps/desktop/stage/out/*.exe
           # The arm64 runner also packages the x64 target, so one job produces the
@@ -39,15 +45,19 @@ jobs:
           - name: macOS
             os: macos-26
             electronBuilderArgs: --mac
+            environment: apple-signing
             artifactPath: |
               .work/ci/deepseek-harness/apps/desktop/stage/out/*.dmg
               .work/ci/deepseek-harness/apps/desktop/stage/out/*.zip
           - name: Linux x64
             os: ubuntu-24.04
             electronBuilderArgs: --linux --x64
+            environment: desktop-build
             artifactPath: |
               .work/ci/deepseek-harness/apps/desktop/stage/out/*.AppImage
               .work/ci/deepseek-harness/apps/desktop/stage/out/*.deb
+    environment:
+      name: ${{ matrix.environment }}
     defaults:
       run:
         working-directory: .work/ci/deepseek-harness
@@ -104,11 +114,85 @@ jobs:
       - name: Stage desktop app
         run: node apps/desktop/scripts/stage.mjs
 
+      - name: Prepare macOS signing credentials
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          SIGN_MACOS: ${{ inputs.signMacos && 'true' || 'false' }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$SIGN_MACOS" != "true" ]]; then
+            echo "macOS signing not requested for this dry-run; building unsigned."
+            echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          missing=()
+          [[ -z "${CSC_LINK:-}" ]] && missing+=("CSC_LINK")
+          [[ -z "${CSC_KEY_PASSWORD:-}" ]] && missing+=("CSC_KEY_PASSWORD")
+          [[ -z "${APPLE_API_KEY_BASE64:-}" ]] && missing+=("APPLE_API_KEY")
+          [[ -z "${APPLE_API_KEY_ID:-}" ]] && missing+=("APPLE_API_KEY_ID")
+          [[ -z "${APPLE_API_ISSUER:-}" ]] && missing+=("APPLE_API_ISSUER")
+
+          if ((${#missing[@]})); then
+            printf '::error title=Missing macOS signing secrets::%s\n' "${missing[*]}"
+            exit 1
+          fi
+
+          multiline=()
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY_BASE64 APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID; do
+            value="${!name:-}"
+            if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+              multiline+=("$name")
+            fi
+          done
+          if ((${#multiline[@]})); then
+            printf '::error title=Invalid macOS signing secrets::Secrets must be stored as single-line values: %s\n' "${multiline[*]}"
+            exit 1
+          fi
+
+          api_key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_BASE64" | base64 -D > "$api_key_path"
+          chmod 600 "$api_key_path"
+
+          if ! grep -q "BEGIN PRIVATE KEY" "$api_key_path"; then
+            echo "::error title=Invalid APPLE_API_KEY::Decoded App Store Connect key is not a .p8 private key."
+            exit 1
+          fi
+
+          {
+            echo "CSC_LINK=$CSC_LINK"
+            echo "CSC_KEY_PASSWORD=$CSC_KEY_PASSWORD"
+            echo "APPLE_API_KEY=$api_key_path"
+            echo "APPLE_API_KEY_ID=$APPLE_API_KEY_ID"
+            echo "APPLE_API_ISSUER=$APPLE_API_ISSUER"
+            if [[ -n "${APPLE_TEAM_ID:-}" ]]; then
+              echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+            fi
+          } >> "$GITHUB_ENV"
+
       - name: Package desktop app
         shell: bash
         env:
           DSH_DESKTOP_UPDATE_BASE_URL: ${{ inputs.updateBaseUrl }}
+          SIGN_MACOS: ${{ inputs.signMacos && 'true' || 'false' }}
         run: |
+          macos_args=()
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            if [ "$SIGN_MACOS" = "true" ]; then
+              macos_args=(-c.mac.forceCodeSigning=true)
+            else
+              export CSC_IDENTITY_AUTO_DISCOVERY=false
+              macos_args=(-c.mac.hardenedRuntime=false -c.mac.notarize=false)
+            fi
+          fi
           publish_args=()
           if [ -n "$DSH_DESKTOP_UPDATE_BASE_URL" ]; then
             case "$DSH_DESKTOP_UPDATE_BASE_URL" in
@@ -117,7 +201,76 @@ jobs:
             esac
             publish_args=(--config.publish.provider=generic --config.publish.url="$DSH_DESKTOP_UPDATE_BASE_URL")
           fi
-          pnpm --dir apps/desktop exec electron-builder ${{ matrix.electronBuilderArgs }} "${publish_args[@]}" --publish never
+          pnpm --dir apps/desktop exec electron-builder ${{ matrix.electronBuilderArgs }} "${publish_args[@]}" "${macos_args[@]}" --publish never
+
+      - name: Notarize and staple macOS DMGs
+        if: runner.os == 'macOS' && inputs.signMacos
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          dmgs=(apps/desktop/stage/out/*.dmg)
+          if ((${#dmgs[@]} == 0)); then
+            echo "::error title=Missing macOS DMG::No DMG files were produced."
+            exit 1
+          fi
+
+          for dmg in "${dmgs[@]}"; do
+            echo "::group::notarize and staple $dmg"
+            echo "started_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            xcrun notarytool submit "$dmg" \
+              --key "$APPLE_API_KEY" \
+              --key-id "$APPLE_API_KEY_ID" \
+              --issuer "$APPLE_API_ISSUER" \
+              --wait
+            xcrun stapler staple "$dmg"
+            xcrun stapler validate "$dmg"
+            rm -f "$dmg.blockmap"
+            echo "completed_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "::endgroup::"
+          done
+
+      - name: Verify macOS signing and notarization
+        if: runner.os == 'macOS' && inputs.signMacos
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          apps=(
+            "apps/desktop/stage/out/mac-arm64/DeepSeek Harness.app"
+            "apps/desktop/stage/out/mac/DeepSeek Harness.app"
+          )
+          for app in "${apps[@]}"; do
+            if [[ ! -d "$app" ]]; then
+              echo "::error title=Missing macOS app::$app was not produced."
+              exit 1
+            fi
+
+            echo "::group::verify app $app"
+            echo "started_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            codesign --verify --deep --strict --verbose=4 "$app"
+            codesign -dv --verbose=4 "$app"
+            xcrun stapler validate "$app"
+            spctl --assess --type execute --verbose=4 "$app"
+            echo "completed_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "::endgroup::"
+          done
+
+          shopt -s nullglob
+          dmgs=(apps/desktop/stage/out/*.dmg)
+          if ((${#dmgs[@]} == 0)); then
+            echo "::error title=Missing macOS DMG::No DMG files were produced."
+            exit 1
+          fi
+
+          for dmg in "${dmgs[@]}"; do
+            echo "::group::verify dmg $dmg"
+            echo "started_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            xcrun stapler validate "$dmg"
+            echo "completed_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "::endgroup::"
+          done
 
       - uses: actions/upload-artifact@v4
         with:
