@@ -19,9 +19,10 @@ extraResources:
 mac:
   category: public.app-category.developer-tools
   icon: build/icon.icns
-  identity: null
-  hardenedRuntime: false
-  notarize: false
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+  notarize: true
   artifactName: deepseek-harness-desktop-darwin-${arch}.${ext}
   target:
     - target: dmg

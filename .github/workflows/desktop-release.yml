@@ -27,7 +27,9 @@
 # the github-actions audience.
 #
 # The landing download page links these artifacts by their version-less names:
-# the version lives in the tag and SHA256SUMS.desktop.
+# the version lives in the tag and SHA256SUMS.desktop. macOS release artifacts
+# are Developer ID signed and notarized through the apple-signing environment
+# before their immutable GitHub Release and OSS copies are published.
 name: Desktop Release
 
 on:
@@ -87,14 +89,6 @@ jobs:
           - name: Windows x64
             os: windows-2025
             electronBuilderArgs: --win --x64
-          # The arm64 runner also packages the x64 target, so one job produces the
-          # Apple Silicon and Intel installers the release publishes together. The
-          # stage bundles a matching Node runtime per architecture (see
-          # apps/desktop/scripts/stage.mjs), so each installer's embedded server
-          # runtime matches its target.
-          - name: macOS
-            os: macos-26
-            electronBuilderArgs: --mac
           - name: Linux x64
             os: ubuntu-24.04
             electronBuilderArgs: --linux --x64
@@ -197,9 +191,229 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  package-macos:
+    name: macOS
+    needs: check-release
+    if: needs.check-release.outputs.exists != 'true'
+    runs-on: macos-26
+    environment:
+      name: apple-signing
+    defaults:
+      run:
+        working-directory: .work/ci/deepseek-harness
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: true
+          # Manual production dispatches rebuild from the tag itself. Manual test
+          # dispatches build the selected workflow ref and create a prerelease tag
+          # from that commit, so a full upload path can run before a production tag
+          # exists. Tag pushes check out the pushed tag with the default empty ref.
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.releaseMode == 'production' && inputs.tag || '' }}
+
+      - name: Sync upstream workspace
+        shell: pwsh
+        working-directory: .
+        run: ./scripts/sync-harness.ps1 -Workspace .work/ci/deepseek-harness
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Configure pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: |
+          store_root="$HOME/.local/share/pnpm/store"
+          echo "PNPM_CONFIG_STORE_DIR=$store_root" >> "$GITHUB_ENV"
+          store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('.work/ci/deepseek-harness/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Stamp the tag into the workspace-root manifest before staging: stage.mjs
+      # records that version in the staged app manifest, which electron-builder
+      # reads for installer metadata. A tag-push of an unbumped repo fails here.
+      - name: Stamp release version
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/stamp-desktop-version.mjs
+
+      - name: Build desktop sources
+        run: pnpm run build:desktop
+
+      - name: Stage desktop app
+        run: node apps/desktop/scripts/stage.mjs
+
+      - name: Prepare macOS signing credentials
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          [[ -z "${CSC_LINK:-}" ]] && missing+=("CSC_LINK")
+          [[ -z "${CSC_KEY_PASSWORD:-}" ]] && missing+=("CSC_KEY_PASSWORD")
+          [[ -z "${APPLE_API_KEY_BASE64:-}" ]] && missing+=("APPLE_API_KEY")
+          [[ -z "${APPLE_API_KEY_ID:-}" ]] && missing+=("APPLE_API_KEY_ID")
+          [[ -z "${APPLE_API_ISSUER:-}" ]] && missing+=("APPLE_API_ISSUER")
+
+          if ((${#missing[@]})); then
+            printf '::error title=Missing macOS signing secrets::%s\n' "${missing[*]}"
+            exit 1
+          fi
+
+          multiline=()
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY_BASE64 APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID; do
+            value="${!name:-}"
+            if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+              multiline+=("$name")
+            fi
+          done
+          if ((${#multiline[@]})); then
+            printf '::error title=Invalid macOS signing secrets::Secrets must be stored as single-line values: %s\n' "${multiline[*]}"
+            exit 1
+          fi
+
+          api_key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_BASE64" | base64 -D > "$api_key_path"
+          chmod 600 "$api_key_path"
+
+          if ! grep -q "BEGIN PRIVATE KEY" "$api_key_path"; then
+            echo "::error title=Invalid APPLE_API_KEY::Decoded App Store Connect key is not a .p8 private key."
+            exit 1
+          fi
+
+          {
+            echo "CSC_LINK=$CSC_LINK"
+            echo "CSC_KEY_PASSWORD=$CSC_KEY_PASSWORD"
+            echo "APPLE_API_KEY=$api_key_path"
+            echo "APPLE_API_KEY_ID=$APPLE_API_KEY_ID"
+            echo "APPLE_API_ISSUER=$APPLE_API_ISSUER"
+            if [[ -n "${APPLE_TEAM_ID:-}" ]]; then
+              echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+            fi
+          } >> "$GITHUB_ENV"
+
+      - name: Package signed macOS app
+        shell: bash
+        env:
+          DSH_DESKTOP_UPDATE_BASE_URL: ${{ vars.DSH_DESKTOP_UPDATE_BASE_URL }}
+        run: |
+          set -euo pipefail
+          publish_args=()
+          if [ -n "$DSH_DESKTOP_UPDATE_BASE_URL" ]; then
+            case "$DSH_DESKTOP_UPDATE_BASE_URL" in
+              https://*) ;;
+              *) echo "error: DSH_DESKTOP_UPDATE_BASE_URL must be an https URL when set" >&2; exit 1 ;;
+            esac
+            publish_args=(--config.publish.provider=generic --config.publish.url="$DSH_DESKTOP_UPDATE_BASE_URL")
+          fi
+          pnpm --dir apps/desktop exec electron-builder --mac "${publish_args[@]}" --publish never -c.mac.forceCodeSigning=true
+
+      - name: Notarize and staple macOS DMGs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          dmgs=(apps/desktop/stage/out/*.dmg)
+          if ((${#dmgs[@]} == 0)); then
+            echo "::error title=Missing macOS DMG::No DMG files were produced."
+            exit 1
+          fi
+
+          for dmg in "${dmgs[@]}"; do
+            echo "::group::notarize and staple $dmg"
+            echo "started_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            xcrun notarytool submit "$dmg" \
+              --key "$APPLE_API_KEY" \
+              --key-id "$APPLE_API_KEY_ID" \
+              --issuer "$APPLE_API_ISSUER" \
+              --wait
+            xcrun stapler staple "$dmg"
+            xcrun stapler validate "$dmg"
+            rm -f "$dmg.blockmap"
+            echo "completed_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "::endgroup::"
+          done
+
+      - name: Verify macOS signing and notarization
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          apps=(
+            "apps/desktop/stage/out/mac-arm64/DeepSeek Harness.app"
+            "apps/desktop/stage/out/mac/DeepSeek Harness.app"
+          )
+          for app in "${apps[@]}"; do
+            if [[ ! -d "$app" ]]; then
+              echo "::error title=Missing macOS app::$app was not produced."
+              exit 1
+            fi
+
+            echo "::group::verify app $app"
+            echo "started_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            codesign --verify --deep --strict --verbose=4 "$app"
+            codesign -dv --verbose=4 "$app"
+            xcrun stapler validate "$app"
+            spctl --assess --type execute --verbose=4 "$app"
+            echo "completed_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "::endgroup::"
+          done
+
+          shopt -s nullglob
+          dmgs=(apps/desktop/stage/out/*.dmg)
+          if ((${#dmgs[@]} == 0)); then
+            echo "::error title=Missing macOS DMG::No DMG files were produced."
+            exit 1
+          fi
+
+          for dmg in "${dmgs[@]}"; do
+            echo "::group::verify dmg $dmg"
+            echo "started_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            xcrun stapler validate "$dmg"
+            echo "completed_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "::endgroup::"
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ runner.os }}
+          path: |
+            .work/ci/deepseek-harness/apps/desktop/stage/out/*.dmg
+            .work/ci/deepseek-harness/apps/desktop/stage/out/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
   release:
     name: Publish GitHub Release
-    needs: [check-release, package]
+    needs: [check-release, package, package-macos]
     if: needs.check-release.outputs.exists != 'true'
     runs-on: ubuntu-24.04
     permissions:
